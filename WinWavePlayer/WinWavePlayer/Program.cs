@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Media;
@@ -9,106 +9,95 @@ namespace WinWavePlayer
 {
     class Program
     {
-        private static DirectoryInfo _directoryInfo;
-
         static void Main(string[] args)
         {
-            var directoryPath = Environment.CurrentDirectory;
+            var shouldListFiles = false;
+            var delayMs = 0;
+            var initialDelayMs = 0;
+            var multiplier = 1;
 
-            if (args.Length > 0)
+            if (args.Length == 0)
             {
-                directoryPath = args[0];
+                Console.WriteLine("Usage: <filename> --repeat 10 --delay 100");
+                return;
             }
 
-            _directoryInfo = new DirectoryInfo(directoryPath);
-
-            while (true)
+            for (var i = 0; i < args.Length; i++)
             {
-                Console.WriteLine("Type something like f123, f123*10@100ms, d123, ls or ..");
-
-                var input = Console.ReadLine();
-
-                try
+                var arg = args[i];
+                if (arg == "--ls")
                 {
-                    var command = CommandParser.Parse(input);
-                    
-                    HandleInput(command);
-                    
-                    ListAll();
+                    shouldListFiles = true;
                 }
-                catch (Exception)
+
+                if (arg == "--delay")
                 {
-                    Console.WriteLine("Invalid command, try again...");
+                    delayMs = int.Parse(args[i + 1]);
+                    i++;
                 }
-            }
-        }
 
-        private static void HandleInput(Command command)
-        {
-            if (command.CommandName == "..")
-            {
-                _directoryInfo = _directoryInfo.Parent;
-            }
-            else if (command.CommandName == "ls")
-            {
-            }
-            else if (command.CommandName == "d")
-            {
-                var directories = GetDirectoryInfos();
-                _directoryInfo = directories[command.CommandNumber - 1];
-            }
-            else if (command.CommandName == "f")
-            {
-                var files = GetWaveFiles();
-                var file = files[command.CommandNumber - 1];
-
-                for (int i = 0; i < command.Multiplicator; i++)
+                if (arg == "--initialdelay")
                 {
-                    new SoundPlayer(file.FullName).Play();
+                    initialDelayMs = int.Parse(args[i + 1]);
+                    i++;
+                }
 
-                    Thread.Sleep(command.DelayMs);
+                if (arg == "--repeat")
+                {
+                    multiplier = int.Parse(args[i + 1]);
+                    i++;
                 }
             }
-            else
+
+            if (args[0] != "--ls")
             {
-                Console.WriteLine("Unknown command");
+                Play(args[0], multiplier, delayMs, initialDelayMs);
+            }
+
+            if (shouldListFiles)
+            {
+                ListWaveFiles();
             }
         }
 
-        private static void ListAll()
+        private static void Play(string path, int multiplier, int delayMs, int initialDelayMs)
         {
-            Console.Clear();
+            var soundPlayer = new SoundPlayer(path);
+            soundPlayer.Load();
 
-            Console.WriteLine("Directory: " + _directoryInfo.FullName);
-
-            var directories = GetDirectoryInfos();
-            var waveFiles = GetWaveFiles();
-
-            Console.WriteLine("..\t..");
-            for (var i = 0; i < directories.Length; i++)
+            if (initialDelayMs > 0)
             {
-                var directory = directories[i];
-                Console.WriteLine($"d{i + 1}.\t{directory.Name}");
+                Thread.Sleep(initialDelayMs);
             }
 
-            for (var i = 0; i < waveFiles.Length; i++)
+            for (int i = 0; i < multiplier; i++)
             {
-                var file = waveFiles[i];
-                Console.WriteLine($"f{i + 1}.\t{file.Name}");
+                var isLast = i == multiplier - 1;
+                
+                if (isLast || delayMs == 0)
+                {
+                    soundPlayer.PlaySync();
+                }
+                else
+                {
+                    soundPlayer.Play();
+                    Thread.Sleep(delayMs);
+                }
             }
         }
 
-        private static FileInfo[] GetWaveFiles()
+        private static void ListWaveFiles()
         {
-            var waveFiles = _directoryInfo.GetFiles("*.wav");
-            return waveFiles.OrderBy(x => x.Name).ToArray();
-        }
+            var directoryInfo = new DirectoryInfo(Environment.CurrentDirectory);
 
-        private static DirectoryInfo[] GetDirectoryInfos()
-        {
-            var directories = _directoryInfo.GetDirectories();
+            var waveFiles = directoryInfo.GetFiles("*.wav")
+                .OrderBy(x => x.Name)
+                .ToArray();
 
-            return directories.OrderBy(x => x.Name).ToArray();
+            foreach (var file in waveFiles)
+            {
+                Console.WriteLine($"{file.Name}");
+            }
         }
     }
 }
