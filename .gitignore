@@ -1,0 +1,13 @@
+[Bb]in
+[Oo]bj
+*.suo
+*.user
+_ReSharper*
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+.idea*
+.DS_Store
+/build
+.vs
